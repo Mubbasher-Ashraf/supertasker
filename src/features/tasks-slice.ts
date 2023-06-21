@@ -1,0 +1,77 @@
+import {
+  createAsyncThunk,
+  createSlice,
+  nanoid,
+  PayloadAction,
+} from '@reduxjs/toolkit';
+
+import data from '../api/data.json';
+import { removeUser } from './users-slice';
+
+export type TasksState = {
+  entities: Task[];
+  loading?: boolean;
+};
+
+type DraftTask = RequireOnly<Task, 'title'>;
+
+export const createTask = (draftTask: DraftTask): Task => {
+  return { id: nanoid(), ...draftTask };
+};
+
+const initialState: TasksState = {
+  entities: data.tasks,
+  loading: false,
+};
+
+const fetchTasks = createAsyncThunk(
+  'tasks/fetchTasks',
+  async (thunkApi): Promise<Task[]> => {
+    try {
+      console.log({ thunkApi });
+      const response = await fetch('/api/tasks').then((res) => res.json());
+      return response.tasks;
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  },
+);
+
+const tasksSlice = createSlice({
+  name: 'tasks',
+  initialState,
+  reducers: {
+    addTask: (state, action: PayloadAction<DraftTask>) => {
+      const task = createTask(action.payload);
+      state.entities.unshift(task);
+    },
+    removeTask: (state, action: PayloadAction<Task['id']>) => {
+      const index = state.entities.findIndex(
+        (task) => task.id === action.payload,
+      );
+      state.entities.splice(index, 1);
+    },
+  },
+  extraReducers(builder) {
+    builder.addCase(removeUser, (state, action) => {
+      const userId = action.payload;
+      for (const task of state.entities) {
+        if (task.user === userId) {
+          task.user = undefined;
+        }
+      }
+    });
+    builder.addCase(fetchTasks.pending, (state, action) => {
+      state.loading = true;
+    });
+    builder.addCase(fetchTasks.fulfilled, (state, action) => {
+      state.loading = false;
+      state.entities = action.payload;
+    });
+  },
+});
+
+export const tasksReducer = tasksSlice.reducer;
+export const { addTask, removeTask } = tasksSlice.actions;
+
+export default tasksSlice;
